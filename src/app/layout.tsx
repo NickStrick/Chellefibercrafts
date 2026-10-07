@@ -23,6 +23,12 @@ const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION 
 
 import { mockSiteConfig } from "@/mocks/chelleConfig";
 import SeoLocalBusinessSchema from "@/components/SeoLocalBusinessSchema";
+import { getConfigFromS3, type ConfigVariant } from "@/lib/configStore";
+import { SiteConfigSchema } from "@/lib/siteSchema";
+
+// The site config lives in S3 and changes whenever the admin saves, so never
+// prerender/cache this layout at build time — always render per request.
+export const dynamic = "force-dynamic";
 
 const siteName = "Chelle's Fiber Crafts";
 const defaultTitle = `${siteName} | Handmade Knit & Crochet`;
@@ -73,34 +79,22 @@ async function getSiteConfig(): Promise<SiteConfig> {
   const useMock = process.env.NEXT_PUBLIC_USE_MOCK === "1" || process.env.NEXT_PUBLIC_USE_MOCK === "2";
   if (useMock) return mockSiteConfig;
 
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? "";
-  const site = process.env.NEXT_PUBLIC_SITE_ID ?? "chelle";
-  const prefer = (process.env.NEXT_PUBLIC_CONFIG_VARIANT ?? "published") as "published" | "published";
-  const fallback = prefer === "published" ? "published" : "published";
+  // Read straight from S3 (same source as /api/config) instead of HTTP-fetching
+  // our own API — no base URL to configure and no extra hop. getConfigFromS3
+  // already returns null on missing object / S3 errors.
+  // The admin bar saves to the draft file (configs/<site>/site.json), so
+  // NEXT_PUBLIC_CONFIG_VARIANT=draft is what makes saves show up.
+  const variant: ConfigVariant =
+    process.env.NEXT_PUBLIC_CONFIG_VARIANT === "draft" ? "draft" : "published";
 
-  async function fetchJSON(url: string) {
-    try {
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.warn(`[config] ${url} -> ${res.status}`, text?.slice(0, 200));
-        return null;
-      }
-      return (await res.json()) as SiteConfig;
-    } catch (err) {
-      // e.g. NEXT_PUBLIC_BASE_URL unset (relative URL on the server) or the API is unreachable
-      console.warn(`[config] ${url} failed`, err);
-      return null;
-    }
+  const data = await getConfigFromS3(variant);
+  if (data) {
+    const parsed = SiteConfigSchema.safeParse(data);
+    if (parsed.success) return parsed.data as SiteConfig;
+    console.warn("[config] S3 config failed validation", parsed.error.flatten());
+  } else {
+    console.warn(`[config] No ${variant} config in S3`);
   }
-
-  // try preferred variant for this site id
-  const primary = await fetchJSON(`${base}/api/config?variant=${prefer}&site=${encodeURIComponent(site)}`);
-  if (primary) return primary;
-
-  // then the other variant
-  const secondary = await fetchJSON(`${base}/api/config?variant=${fallback}&site=${encodeURIComponent(site)}`);
-  if (secondary) return secondary;
 
   console.warn("[config] Falling back to mockSiteConfig");
   return mockSiteConfig;
