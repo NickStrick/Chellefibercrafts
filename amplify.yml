@@ -1,0 +1,25 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        # Next 16 needs Node >= 20.9
+        - nvm use 20 || nvm install 20
+        - node -v
+        - npm ci
+    build:
+      commands:
+        # Amplify console env vars only exist at BUILD time. Server code (API routes,
+        # SSR) reads them at RUNTIME, so copy the ones it needs into .env.production.
+        # NEXT_PUBLIC_* are inlined at build anyway, but writing them here is harmless.
+        # "|| true" keeps the build from failing when a pattern has no matches.
+        - env | grep -e '^NEXT_PUBLIC_' -e '^S3_' >> .env.production || true
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - node_modules/**/*

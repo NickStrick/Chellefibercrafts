@@ -14,6 +14,7 @@ function assertAdmin(req: NextRequest): NextResponse | null {
 const REGION = process.env.AWS_REGION || 'us-east-2';
 const BUCKET =
   process.env.NEXT_PUBLIC_S3_DEFAULT_BUCKET ||
+  process.env.S3_DEFAULT_BUCKET ||
   process.env.S3_GALLERY_BUCKET ||
   '';
 
