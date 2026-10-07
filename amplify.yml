@@ -13,7 +13,7 @@ frontend:
         # SSR) reads them at RUNTIME, so copy the ones it needs into .env.production.
         # NEXT_PUBLIC_* are inlined at build anyway, but writing them here is harmless.
         # "|| true" keeps the build from failing when a pattern has no matches.
-        - env | grep -e '^NEXT_PUBLIC_' -e '^S3_' >> .env.production || true
+        - env | grep -e '^NEXT_PUBLIC_' -e '^S3_' -e '^APP_AWS_' >> .env.production || true
         - npm run build
   artifacts:
     baseDirectory: .next

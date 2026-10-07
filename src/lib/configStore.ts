@@ -5,8 +5,8 @@ import {
   PutObjectCommand,
   CopyObjectCommand,
 } from '@aws-sdk/client-s3';
+import { awsClientConfig } from '@/lib/awsConfig';
 
-const REGION = process.env.AWS_REGION || 'us-east-1';
 const BUCKET =
   process.env.NEXT_PUBLIC_S3_DEFAULT_BUCKET ||
   process.env.S3_DEFAULT_BUCKET ||
@@ -15,7 +15,7 @@ const SITE_ID = process.env.NEXT_PUBLIC_SITE_ID || 'default';
 
 export type ConfigVariant = 'draft' | 'published';
 
-const s3 = new S3Client({ region: REGION });
+const s3 = new S3Client(awsClientConfig());
 
 function keyFor(variant: ConfigVariant) {
   return `configs/${SITE_ID}/${variant === 'published' ? 'site.published.json' : 'site.json'}`;
